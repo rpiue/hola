@@ -1,23 +1,24 @@
 const qrcode = require("qrcode-terminal");
-const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");const express = require("express");
+const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");
+const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
 const puppeteer = require("puppeteer");
-const express = require("express");
 
-let client;
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+let client; // Definición global del cliente
+let envioActivo = false; // Control del envío de mensajes
+
 // Función asíncrona para inicializar el cliente
 async function initializeClient() {
-  const client = new Client({
+  client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      // Aquí no utilizamos `await` sino que simplemente llamamos al método
       executablePath: puppeteer.executablePath(), // Usa la versión de Chromium
     },
   });
@@ -35,12 +36,7 @@ async function initializeClient() {
 
   // Inicializar el cliente
   await client.initialize();
-  return client;
 }
-
-// Inicializar el cliente
-initializeClient().catch(error => console.error('Error al inicializar el cliente:', error));
-
 
 // Configurar el servidor para servir archivos estáticos
 app.use(express.static("public"));
@@ -50,10 +46,7 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/index.html"); // Archivo HTML para mostrar el QR
 });
 
-// Variables para controlar el envío de mensajes
-let envioActivo = false;
-
-
+// Leer números desde una URL
 async function leerNumerosDesdeUrl(urlArchivo) {
   const response = await axios.get(urlArchivo); // Obtener el archivo desde la URL
   return response.data
@@ -65,17 +58,14 @@ async function leerNumerosDesdeUrl(urlArchivo) {
     .filter((contacto) => contacto.numero); // Filtrar contactos válidos
 }
 
-// Función para enviar mensajes a la lista de números
+// Enviar mensajes a la lista de números
 async function enviarMensajes(url, numeroParaContinuar) {
-  const contactos = await  leerNumerosDesdeUrl(url); // Lee los números del archivo
-  console.log(contactos);
+  const contactos = await leerNumerosDesdeUrl(url); // Lee los números del archivo
   const imagen = MessageMedia.fromFilePath("promocion.png"); // Ruta a la imagen
   const posicionInicio = encontrarPosicion(contactos, numeroParaContinuar) + 1;
 
   if (posicionInicio === -1) {
-    console.log(
-      `El número ${numeroParaContinuar} no se encuentra en la lista.`
-    );
+    console.log(`El número ${numeroParaContinuar} no se encuentra en la lista.`);
     return;
   }
 
@@ -117,7 +107,7 @@ async function enviarMensajes(url, numeroParaContinuar) {
   console.log("Todos los mensajes han sido enviados.");
 }
 
-// Función para crear un mensaje personalizado
+// Crear un mensaje personalizado
 function crearMensajePersonalizado(nombre) {
   return (
     `¡Hola, ${nombre}! 👋 Soy CodexPE\n` +
@@ -133,13 +123,8 @@ function crearMensajePersonalizado(nombre) {
 
 // Buscar la posición del número específico en la lista
 function encontrarPosicion(contactos, numeroEspecifico) {
-  return contactos.findIndex(
-    (contacto) => contacto.numero === numeroEspecifico
-  );
+  return contactos.findIndex((contacto) => contacto.numero === numeroEspecifico);
 }
-
-// Inicializa el cliente
-client.initialize();
 
 // Escuchar eventos del cliente para iniciar y detener el envío
 io.on("connection", (socket) => {
@@ -160,8 +145,10 @@ io.on("connection", (socket) => {
   });
 });
 
-// Iniciar el servidor
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Servidor en ejecución en http://localhost:${PORT}`);
-});
+// Inicializa el cliente y arranca el servidor
+initializeClient().then(() => {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => {
+    console.log(`Servidor en ejecución en http://localhost:${PORT}`);
+  });
+}).catch(error => console.error('Error al inicializar el cliente:', error));
