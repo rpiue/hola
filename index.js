@@ -1,4 +1,3 @@
-const fs = require("fs");
 const qrcode = require("qrcode-terminal");
 const { Client, MessageMedia } = require("whatsapp-web.js");
 const express = require("express");
@@ -6,7 +5,11 @@ const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
 // Crear una nueva instancia del cliente
-const client = new Client();
+const client = new Client({
+  puppeteer: {
+      executablePath: '/usr/bin/google-chrome' // O la ruta correcta en el entorno de Render
+  }
+});
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
