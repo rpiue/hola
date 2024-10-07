@@ -1,46 +1,24 @@
+const fs = require("fs");
 const qrcode = require("qrcode-terminal");
 const { Client, MessageMedia } = require("whatsapp-web.js");
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
-const { default: puppeteer } = require('puppeteer');
+// Crear una nueva instancia del cliente
+const client = new Client({
+  puppeteer: {
+    executablePath: '/usr/bin/chromium-browser', // Ruta al ejecutable de Chromium
+    headless: true, // Ejecutar en modo headless
+    args: ['--no-sandbox', '--disable-setuid-sandbox'], // Agregar argumentos para evitar problemas
+  },
+});
 
+client.initialize();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-
-// Función asíncrona para inicializar el cliente
-async function initializeClient() {
-  const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      // Aquí no utilizamos `await` sino que simplemente llamamos al método
-      executablePath: require('puppeteer').executablePath(), // Usa la versión de Chromium
-    },
-  });
-
-  // Manejo de eventos del cliente
-  client.on("qr", (qr) => {
-    qrcode.generate(qr, { small: true });
-    io.emit("qr", qr);
-  });
-
-  client.on("ready", () => {
-    console.log("Cliente listo para enviar mensajes.");
-    io.emit("ready");
-  });
-
-  // Inicializar el cliente
-  await client.initialize();
-  return client;
-}
-
-// Inicializar el cliente
-initializeClient().catch(error => console.error('Error al inicializar el cliente:', error));
-
 
 // Configurar el servidor para servir archivos estáticos
 app.use(express.static("public"));
@@ -48,6 +26,18 @@ app.use(express.static("public"));
 // Ruta principal
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/index.html"); // Archivo HTML para mostrar el QR
+});
+
+// Manejar el evento de QR
+client.on("qr", (qr) => {
+  qrcode.generate(qr, { small: true }); // Mostrar QR en la terminal
+  io.emit("qr", qr); // Emitir el QR al cliente web
+});
+
+// Cuando el cliente está listo
+client.on("ready", () => {
+  console.log("Cliente listo para enviar mensajes.");
+  io.emit("ready"); // Emitir un evento cuando el cliente está listo
 });
 
 // Variables para controlar el envío de mensajes
