@@ -4,11 +4,14 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
-// Crear una nueva instancia del cliente
+const { default: puppeteer } = require('puppeteer');
+
 const client = new Client({
-  puppeteer: {
-      executablePath: '/usr/bin/google-chrome' // O la ruta correcta en el entorno de Render
-  }
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath: await puppeteer.executablePath(), // Usa la versión de Chromium
+    },
 });
 const app = express();
 const server = http.createServer(app);
