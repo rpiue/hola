@@ -1,12 +1,12 @@
 const qrcode = require("qrcode-terminal");
 const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");const express = require("express");
-const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
-const { default: puppeteer } = require('puppeteer');
+const puppeteer = require("puppeteer");
+const express = require("express");
 
-
+let client;
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
@@ -18,7 +18,7 @@ async function initializeClient() {
     puppeteer: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       // Aquí no utilizamos `await` sino que simplemente llamamos al método
-      executablePath: require('puppeteer').executablePath(), // Usa la versión de Chromium
+      executablePath: puppeteer.executablePath(), // Usa la versión de Chromium
     },
   });
 
