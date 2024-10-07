@@ -15,11 +15,15 @@ let envioActivo = false; // Control del envío de mensajes
 
 // Función asíncrona para inicializar el cliente
 async function initializeClient() {
+  const browser = await puppeteer.launch({
+    headless: true, // Puedes cambiar a false si deseas ver el navegador
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
   client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: puppeteer.executablePath(), // Usa la versión de Chromium
+      browserWSEndpoint: browser.wsEndpoint(), // Usar el endpoint del navegador lanzado
     },
   });
 
@@ -65,7 +69,9 @@ async function enviarMensajes(url, numeroParaContinuar) {
   const posicionInicio = encontrarPosicion(contactos, numeroParaContinuar) + 1;
 
   if (posicionInicio === -1) {
-    console.log(`El número ${numeroParaContinuar} no se encuentra en la lista.`);
+    console.log(
+      `El número ${numeroParaContinuar} no se encuentra en la lista.`
+    );
     return;
   }
 
@@ -123,7 +129,9 @@ function crearMensajePersonalizado(nombre) {
 
 // Buscar la posición del número específico en la lista
 function encontrarPosicion(contactos, numeroEspecifico) {
-  return contactos.findIndex((contacto) => contacto.numero === numeroEspecifico);
+  return contactos.findIndex(
+    (contacto) => contacto.numero === numeroEspecifico
+  );
 }
 
 // Escuchar eventos del cliente para iniciar y detener el envío
@@ -146,9 +154,11 @@ io.on("connection", (socket) => {
 });
 
 // Inicializa el cliente y arranca el servidor
-initializeClient().then(() => {
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => {
-    console.log(`Servidor en ejecución en http://localhost:${PORT}`);
-  });
-}).catch(error => console.error('Error al inicializar el cliente:', error));
+initializeClient()
+  .then(() => {
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+      console.log(`Servidor en ejecución en http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => console.error("Error al inicializar el cliente:", error));
