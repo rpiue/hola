@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escanear QR</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            /* Fondo oscuro */
+            color: #ffffff;
+            /* Texto blanco */
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        header {
+            background-color: #25D366;
+            /* Color de WhatsApp */
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            color: #0b2e00;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        header img {
+            height: 40px;
+            /* Logo de WhatsApp */
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        }
+
+        #qr-code {
+            margin: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #qr-code img {
+            border: 3px solid #25D366;
+            /* Borde verde */
+            border-radius: 10px;
+            background-color: #fff;
+            /* Fondo blanco para el QR */
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        #message-counter {
+            margin: 20px;
+            font-size: 18px;
+            color: #ffffff;
+            /* Color blanco para el contador */
+            text-align: center;
+        }
+
+        #terminal {
+            background-color: #222;
+            /* Color de fondo de la terminal */
+            color: #00ff00;
+            /* Texto verde */
+            width: 90%;
+            /* Ajustado para ser más responsivo */
+            height: auto;
+            max-width: 600px;
+            max-height: 800px;
+            overflow-y: auto;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            /* Espacio debajo de la terminal */
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            padding: 10px;
+            width: 80%;
+            /* Ajustado para ser más responsivo */
+            max-width: 300px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #25D366;
+            /* Color de WhatsApp */
+            color: #0b2e00;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #20b358;
+            /* Color más oscuro al pasar el mouse */
+        }
+
+        footer {
+            background-color: #25D366;
+            /* Color de WhatsApp */
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            color: #0b2e00;
+            position: relative;
+            bottom: 0;
+            margin-top: auto;
+            /* Asegura que el pie de página se mantenga en la parte inferior */
+            box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.2);
+            /* Sombra en la parte superior */
+            border-radius: 0 0 8px 8px;
+            /* Bordes redondeados en la parte inferior */
+        }
+
+        footer span {
+            font-size: larger;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp Logo">
+        <h1>Bot de WhatsApp by CodexPE</h1>
+    </header>
+
+    <div id="qr-code-mode">
+        <p id="qr-code-mode" style="color: #fa0000; font-family: Courier New, Courier, monospace; font-size: large;">
+            <b>BOT Apagado</b>
+        </p>
+    </div>
+
+    <div id="formulario" style="display: none;">
+        <div id="message-counter">Mensajes enviados: <span id="counter">0</span></div>
+
+        <label for="url">URL del archivo .txt:</label>
+        <input type="text" id="url" required>
+        <input type="text" id="numero-para-continuar" placeholder="Ingrese el número para continuar" />
+        <button id="iniciar-envio">Iniciar Envío</button>
+        <button id="startFromZero">Iniciar Envío 0</button>
+        <button id="detener-envio">Detener Envío</button>
+    </div>
+
+    <div id="terminal">
+        <center>
+            <h1>Escanea el código QR</h1>
+            <div id="qr-code"></div>
+        </center>
+    </div>
+
+    <footer>
+        <span>Desarrollado por CodexPe</span>
+    </footer>
+
+    <script>
+        const socket = io();
+        let messageCount = 0; // Contador de mensajes enviados
+        let envioActivo = false; // Estado del envío
+        let numerosContacto = []; // Almacenar números de contacto
+
+        socket.on('qr', (qr) => {
+            const qrCodeElement = document.getElementById('qr-code');
+            qrCodeElement.innerHTML = ''; // Limpiar el contenido anterior
+            const img = document.createElement('img');
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=250x250`;
+            qrCodeElement.appendChild(img);
+        });
+
+        // Función para manejar la carga de archivo
+        // Función para manejar la carga de archivo
+        //document.getElementById('archivo-numeros').addEventListener('change', function (event) {
+        //    const archivo = event.target.files[0];
+        //    if (archivo) {
+        //        const lector = new FileReader();
+        //        lector.onload = function (e) {
+        //            const contenido = e.target.result;
+        //            try {
+        //                // Procesar el contenido del archivo .txt
+        //                numerosContacto = contenido.split('\n').map(linea => {
+        //                    const [nombre, numero] = linea.split(',').map(item => item.trim());
+        //                    if (!numero) throw new Error("Número vacío en la línea: " + linea);
+        //                    return { nombre, numero };
+        //                });
+        //            } catch (error) {
+        //                alert("Error al procesar el archivo: " + error.message);
+        //            }
+        //        };
+        //        lector.readAsText(archivo);
+        //    }
+        //});
+
+
+        // Función para iniciar el envío de mensajes
+        document.getElementById('startFromZero').addEventListener('click', function () {
+            const url = document.getElementById('url').value; // Obtener la URL del campo de entrada
+            if (url) {
+                socket.emit('empezar-de-cero', url); // Emitir el evento para iniciar desde el primer número
+            } else {
+                alert("Por favor, ingrese la URL del archivo .txt.");
+            }
+        });
+
+
+        document.getElementById('iniciar-envio').onclick = function () {
+            const numero = document.getElementById('numero-para-continuar').value.trim();
+            const url = document.getElementById('url').value;
+            if (numero) {
+                socket.emit('iniciar-envio', url, numero); // Enviar número y lista al servidor
+                envioActivo = true;
+            } else {
+                alert('Por favor, ingresa un número válido.');
+            }
+        };
+
+        // Función para detener el envío de mensajes
+        document.getElementById('detener-envio').onclick = function () {
+            socket.emit('detener-envio'); // Enviar evento para detener el envío
+            envioActivo = false;
+        };
+
+
+
+        socket.on('qr', (qr) => {
+            const qrCodeElement = document.getElementById('qr-code');
+            qrCodeElement.innerHTML = ''; // Limpiar el contenido anterior
+            const img = document.createElement('img');
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=250x250`;
+            qrCodeElement.appendChild(img);
+        });
+
+
+        socket.on('ready', () => {
+            const qrCodeElementMode = document.getElementById('qr-code-mode');
+            const formu = document.getElementById('formulario');
+            formu.style.display = 'block';
+            const qrCodeElement = document.getElementById('terminal');
+            qrCodeElement.innerHTML = '';
+            qrCodeElementMode.innerHTML = '<p id="qr-code-mode" style="color: #00ff00; font-family: Courier New, Courier, monospace; font-size: large;"><b>BOT ACTIVADO</b></p>';
+        });
+
+        socket.on('messageSent', (nombre, numero) => {
+            messageCount++;
+            document.getElementById('counter').innerText = messageCount; // Actualizar contador
+
+            // Agregar mensaje a la "terminal"
+            const terminal = document.getElementById('terminal');
+            const timestamp = new Date().toLocaleTimeString(); // Obtener timestamp
+            terminal.innerHTML += `<span>${timestamp} - Mensaje enviado a ${nombre} (${numero})</span><br>`;
+            terminal.scrollTop = terminal.scrollHeight; // Desplazar hacia abajo
+        });
+
+        socket.on('error', (error) => {
+            const terminal = document.getElementById('terminal');
+            terminal.innerHTML += `<span style="color: red;">Error: ${error}</span><br>`;
+            terminal.scrollTop = terminal.scrollHeight; // Desplazar hacia abajo
+        });
+    </script>
+</body>
+
+</html>
