@@ -6,16 +6,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const axios = require("axios");
 // Crear una nueva instancia del cliente
-const client = new Client({
-  puppeteer: {
-    executablePath: '/usr/bin/chromium-browser', // Ruta al ejecutable de Chromium
-    headless: true, // Ejecutar en modo headless
-    args: ['--no-sandbox', '--disable-setuid-sandbox'], // Agregar argumentos para evitar problemas
-  },
-});
-
-client.initialize();
-
+const client = new Client();
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
